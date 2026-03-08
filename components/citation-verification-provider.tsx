@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useRef, useSyncExternalStore } 
 export interface CitationVerificationData {
   verifications: Record<string, unknown>;
   visibleText: string;
+  renderedMarkdown: string;
   attachmentIds: string[];
 }
 

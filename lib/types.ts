@@ -45,6 +45,7 @@ export type CustomUIDataTypes = {
   "citation-verification": {
     verifications: Record<string, unknown>;
     visibleText: string;
+    renderedMarkdown: string;
     attachmentIds: string[];
   };
 };

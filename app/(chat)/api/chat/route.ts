@@ -2,6 +2,7 @@ import {
   extractVisibleText,
   getAllCitationsFromLlmOutput,
   groupCitationsByAttachmentId,
+  renderCitationsAsMarkdown,
   wrapCitationPrompt,
 } from "deepcitation";
 import { geolocation, ipAddress } from "@vercel/functions";
@@ -168,6 +169,10 @@ export async function POST(request: Request) {
     let finalSystemPrompt = baseSystemPrompt;
 
     if (deepCitationData) {
+      console.log("[DeepCitation] Wrapping prompts with citation instructions", {
+        attachmentIds: deepCitationData.attachmentIds,
+        deepTextLength: deepCitationData.deepTextPromptPortion?.length,
+      });
       const lastUserMsg = modelMessages
         .filter((m) => m.role === "user")
         .at(-1);
@@ -261,9 +266,13 @@ export async function POST(request: Request) {
           if (dc) {
             try {
               const fullText = await result.text;
-              const citations = getAllCitationsFromLlmOutput(fullText);
+              console.log("[DeepCitation] LLM output length:", fullText.length);
 
-              if (Object.keys(citations).length > 0) {
+              const citations = getAllCitationsFromLlmOutput(fullText);
+              const citationCount = Object.keys(citations).length;
+              console.log("[DeepCitation] Parsed citations:", citationCount);
+
+              if (citationCount > 0) {
                 const citationsByAttachment =
                   groupCitationsByAttachmentId(citations);
                 const allVerifications: Record<string, unknown> = {};
@@ -271,6 +280,7 @@ export async function POST(request: Request) {
                 const verifyPromises = Array.from(
                   citationsByAttachment.entries()
                 ).map(async ([attachmentId, fileCitations]) => {
+                  console.log("[DeepCitation] Verifying attachment:", attachmentId, "citations:", fileCitations.length);
                   const response = await dc.verifyAttachment(
                     attachmentId,
                     fileCitations
@@ -279,6 +289,13 @@ export async function POST(request: Request) {
                 });
 
                 await Promise.all(verifyPromises);
+                console.log("[DeepCitation] Verification complete, keys:", Object.keys(allVerifications).length);
+
+                // Render citations as markdown with verification indicators
+                const rendered = renderCitationsAsMarkdown(fullText, {
+                  verifications: allVerifications as Record<string, never>,
+                  indicatorStyle: "check",
+                });
 
                 const visibleText = extractVisibleText(fullText);
 
@@ -287,13 +304,29 @@ export async function POST(request: Request) {
                   data: {
                     verifications: allVerifications,
                     visibleText,
+                    renderedMarkdown: rendered.full,
+                    attachmentIds: deepCitationData.attachmentIds,
+                  },
+                });
+              } else {
+                // No citations found — still send rendered text without citation data block
+                const visibleText = extractVisibleText(fullText);
+                console.log("[DeepCitation] No citations in LLM output, sending visible text only");
+                dataStream.write({
+                  type: "data-citation-verification",
+                  data: {
+                    verifications: {},
+                    visibleText,
+                    renderedMarkdown: visibleText,
                     attachmentIds: deepCitationData.attachmentIds,
                   },
                 });
               }
             } catch (verifyError) {
-              console.error("Citation verification failed:", verifyError);
+              console.error("[DeepCitation] Citation verification failed:", verifyError);
             }
+          } else {
+            console.warn("[DeepCitation] No API key configured — skipping verification");
           }
         }
       },

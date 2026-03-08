@@ -37,6 +37,7 @@ export function DataStreamHandler() {
         const data = delta.data as {
           verifications: Record<string, unknown>;
           visibleText: string;
+          renderedMarkdown: string;
           attachmentIds: string[];
         };
         setVerification("__latest", data);

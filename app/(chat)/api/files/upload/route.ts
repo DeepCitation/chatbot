@@ -89,6 +89,7 @@ export async function POST(request: Request) {
       const dc = getDeepCitationClient();
       if (dc) {
         try {
+          console.log("[DeepCitation] Preparing attachment:", filename, "size:", fileBuffer.byteLength);
           const result = await dc.prepareAttachments([
             {
               file: Buffer.from(fileBuffer),
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
 
           const attachment = result.attachments[0];
           if (attachment) {
+            console.log("[DeepCitation] Attachment prepared:", attachment.attachmentId, "deepTextLength:", result.deepTextPromptPortion?.length);
             return NextResponse.json({
               ...responseData,
               deepCitation: {
@@ -106,10 +108,12 @@ export async function POST(request: Request) {
               },
             });
           }
+          console.warn("[DeepCitation] prepareAttachments returned no attachment");
         } catch (dcError) {
-          // Log but don't fail the upload if DeepCitation fails
-          console.error("DeepCitation prepareAttachments failed:", dcError);
+          console.error("[DeepCitation] prepareAttachments failed:", dcError);
         }
+      } else {
+        console.warn("[DeepCitation] No API key configured — skipping file preparation");
       }
 
       return NextResponse.json(responseData);

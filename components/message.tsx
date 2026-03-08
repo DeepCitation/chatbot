@@ -141,8 +141,12 @@ const PurePreviewMessage = ({
 
             if (type === "text") {
               if (mode === "view") {
-                // sanitizeText strips both <has_function_call> and <<<CITATION_DATA>>> blocks
-                const displayText = sanitizeText(part.text);
+                // Use server-rendered citation markdown when available,
+                // otherwise fall back to sanitized text
+                const displayText =
+                  message.role === "assistant" && citationData?.renderedMarkdown
+                    ? citationData.renderedMarkdown
+                    : sanitizeText(part.text);
 
                 return (
                   <div key={key}>
