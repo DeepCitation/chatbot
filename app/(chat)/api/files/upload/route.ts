@@ -73,16 +73,22 @@ export async function POST(request: Request) {
 
     try {
       const data = await put(`${filename}`, fileBuffer, {
-        access: "public",
+        access: "private",
         addRandomSuffix: true,
       });
 
-      // For non-image documents, always override contentType so the client
-      // never sends raw bytes as a file part (LLMs can't process DOCX/PDF etc.)
-      // Document content reaches the LLM via deepTextPromptPortion instead.
-      const responseData = !isImage
-        ? { ...data, contentType: "application/deepcitation" }
-        : data;
+      // For images: use a base64 data URL so the LLM can read the image
+      // without fetching the private blob URL (which would 403).
+      // For documents: override contentType so the client never sends raw
+      // bytes as a file part — content reaches the LLM via deepTextPromptPortion.
+      let responseData: Record<string, unknown>;
+      if (isImage) {
+        const base64 = Buffer.from(fileBuffer).toString("base64");
+        const dataUrl = `data:${file.type};base64,${base64}`;
+        responseData = { ...data, url: dataUrl };
+      } else {
+        responseData = { ...data, contentType: "application/deepcitation" };
+      }
 
       // Prepare attachment with DeepCitation if available
       const dc = getDeepCitationClient();
