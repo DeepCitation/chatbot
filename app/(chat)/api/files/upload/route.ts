@@ -5,21 +5,34 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { getDeepCitationClient } from "@/lib/ai/deepcitation";
 
+const ALLOWED_MIME_TYPES = [
+  // Images
+  "image/jpeg",
+  "image/png",
+  "image/tiff",
+  "image/webp",
+  // Documents
+  "application/pdf",
+  // Office files
+  "application/msword", // .doc
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "application/vnd.ms-excel", // .xls
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+  "application/vnd.ms-powerpoint", // .ppt
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+];
+
 // Use Blob instead of File since File is not available in Node.js environment
 const FileSchema = z.object({
   file: z
     .instanceof(Blob)
-    .refine((file) => file.size <= 5 * 1024 * 1024, {
-      message: "File size should be less than 5MB",
+    .refine((file) => file.size <= 50 * 1024 * 1024, {
+      message: "File size should be less than 50MB",
     })
-    // Update the file type based on the kind of files you want to accept
-    .refine(
-      (file) =>
-        ["image/jpeg", "image/png", "application/pdf"].includes(file.type),
-      {
-        message: "File type should be JPEG, PNG, or PDF",
-      }
-    ),
+    .refine((file) => ALLOWED_MIME_TYPES.includes(file.type), {
+      message:
+        "Unsupported file type. Accepted: images (JPEG, PNG, TIFF, WebP), PDF, and Office documents (DOC, DOCX, XLS, XLSX, PPT, PPTX)",
+    }),
 });
 
 export async function POST(request: Request) {
