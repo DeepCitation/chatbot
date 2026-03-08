@@ -101,12 +101,17 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json(data);
-    } catch (_error) {
-      return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    } catch (error) {
+      console.error("Upload failed:", error);
+      return NextResponse.json(
+        { error: `Upload failed: ${error instanceof Error ? error.message : String(error)}` },
+        { status: 500 }
+      );
     }
-  } catch (_error) {
+  } catch (error) {
+    console.error("Failed to process request:", error);
     return NextResponse.json(
-      { error: "Failed to process request" },
+      { error: `Failed to process request: ${error instanceof Error ? error.message : String(error)}` },
       { status: 500 }
     );
   }
