@@ -1,6 +1,5 @@
 "use client";
 import type { UseChatHelpers } from "@ai-sdk/react";
-import { extractVisibleText } from "deepcitation";
 import { useEffect, useState } from "react";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
@@ -143,11 +142,8 @@ const PurePreviewMessage = ({
 
             if (type === "text") {
               if (mode === "view") {
-                // For assistant messages with citation data, strip the citation data block
-                const displayText =
-                  message.role === "assistant" && citationData
-                    ? sanitizeText(extractVisibleText(part.text))
-                    : sanitizeText(part.text);
+                // sanitizeText strips both <has_function_call> and <<<CITATION_DATA>>> blocks
+                const displayText = sanitizeText(part.text);
 
                 return (
                   <div key={key}>

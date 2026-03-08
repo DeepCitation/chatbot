@@ -245,11 +245,19 @@ export async function POST(request: Request) {
           },
         });
 
+        // Merge the LLM stream — this pipes tokens to the client immediately
         dataStream.merge(
           result.toUIMessageStream({ sendReasoning: isReasoningModel })
         );
 
-        // Citation verification: parse and verify after LLM finishes
+        if (titlePromise) {
+          const title = await titlePromise;
+          dataStream.write({ type: "data-chat-title", data: title });
+          updateChatTitleById({ chatId: id, title });
+        }
+
+        // Citation verification runs after the LLM finishes but before
+        // the stream closes, so the verification event reaches the client
         if (deepCitationData) {
           const dc = getDeepCitationClient();
           if (dc) {
@@ -289,12 +297,6 @@ export async function POST(request: Request) {
               console.error("Citation verification failed:", verifyError);
             }
           }
-        }
-
-        if (titlePromise) {
-          const title = await titlePromise;
-          dataStream.write({ type: "data-chat-title", data: title });
-          updateChatTitleById({ chatId: id, title });
         }
       },
       generateId: generateUUID,

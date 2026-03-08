@@ -72,10 +72,9 @@ export async function POST(request: Request) {
     const isImage = IMAGE_MIME_TYPES.includes(file.type);
 
     try {
-      // Images: public so the LLM can access via URL for vision
-      // Documents: public for preview/download, but content goes via deepTextPromptPortion
+      // Private store requires private access; returned URLs include auth tokens
       const data = await put(`${filename}`, fileBuffer, {
-        access: "public",
+        access: "private",
       });
 
       // Prepare attachment with DeepCitation if available
