@@ -5,15 +5,15 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { getDeepCitationClient } from "@/lib/ai/deepcitation";
 
-const ALLOWED_MIME_TYPES = [
-  // Images
+const IMAGE_MIME_TYPES = [
   "image/jpeg",
   "image/png",
   "image/tiff",
   "image/webp",
-  // Documents
+];
+
+const DOCUMENT_MIME_TYPES = [
   "application/pdf",
-  // Office files
   "application/msword", // .doc
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
   "application/vnd.ms-excel", // .xls
@@ -21,6 +21,8 @@ const ALLOWED_MIME_TYPES = [
   "application/vnd.ms-powerpoint", // .ppt
   "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
 ];
+
+const ALLOWED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...DOCUMENT_MIME_TYPES];
 
 // Use Blob instead of File since File is not available in Node.js environment
 const FileSchema = z.object({
@@ -67,10 +69,13 @@ export async function POST(request: Request) {
     // Get filename from formData since Blob doesn't have name property
     const filename = (formData.get("file") as File).name;
     const fileBuffer = await file.arrayBuffer();
+    const isImage = IMAGE_MIME_TYPES.includes(file.type);
 
     try {
+      // Images: public so the LLM can access via URL for vision
+      // Documents: public for preview/download, but content goes via deepTextPromptPortion
       const data = await put(`${filename}`, fileBuffer, {
-        access: "private",
+        access: "public",
       });
 
       // Prepare attachment with DeepCitation if available
@@ -88,6 +93,9 @@ export async function POST(request: Request) {
           if (attachment) {
             return NextResponse.json({
               ...data,
+              // For documents, override contentType so client doesn't send
+              // raw bytes as a file part (LLMs can't process DOCX/PPTX etc.)
+              ...(!isImage ? { contentType: "application/deepcitation" } : {}),
               deepCitation: {
                 attachmentId: attachment.attachmentId,
                 deepTextPromptPortion: result.deepTextPromptPortion,

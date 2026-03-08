@@ -167,10 +167,16 @@ function PureMultimodalInput({
       }
     }
 
+    // Only include image attachments as file parts — documents are handled
+    // via deepTextPromptPortion and can't be processed as raw file parts by LLMs
+    const imageAttachments = attachments.filter(
+      (a) => a.contentType !== "application/deepcitation"
+    );
+
     sendMessage({
       role: "user",
       parts: [
-        ...attachments.map((attachment) => ({
+        ...imageAttachments.map((attachment) => ({
           type: "file" as const,
           url: attachment.url,
           name: attachment.name,
