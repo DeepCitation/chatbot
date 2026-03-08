@@ -68,6 +68,7 @@ function PureMultimodalInput({
   selectedVisibilityType,
   selectedModelId,
   onModelChange,
+  deepCitationRef,
 }: {
   chatId: string;
   input: string;
@@ -83,6 +84,10 @@ function PureMultimodalInput({
   selectedVisibilityType: VisibilityType;
   selectedModelId: string;
   onModelChange?: (modelId: string) => void;
+  deepCitationRef?: React.MutableRefObject<{
+    attachmentIds: string[];
+    deepTextPromptPortion: string;
+  } | null>;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -147,6 +152,21 @@ function PureMultimodalInput({
   const submitForm = useCallback(() => {
     window.history.pushState({}, "", `/chat/${chatId}`);
 
+    // Aggregate deepCitation metadata from attachments before sending
+    if (deepCitationRef) {
+      const dcAttachments = attachments.filter((a) => a.deepCitation);
+      if (dcAttachments.length > 0) {
+        deepCitationRef.current = {
+          attachmentIds: dcAttachments.map(
+            (a) => a.deepCitation!.attachmentId
+          ),
+          deepTextPromptPortion: dcAttachments
+            .map((a) => a.deepCitation!.deepTextPromptPortion)
+            .join("\n\n"),
+        };
+      }
+    }
+
     sendMessage({
       role: "user",
       parts: [
@@ -181,6 +201,7 @@ function PureMultimodalInput({
     width,
     chatId,
     resetHeight,
+    deepCitationRef,
   ]);
 
   const uploadFile = useCallback(async (file: File) => {
@@ -195,12 +216,13 @@ function PureMultimodalInput({
 
       if (response.ok) {
         const data = await response.json();
-        const { url, pathname, contentType } = data;
+        const { url, pathname, contentType, deepCitation } = data;
 
         return {
           url,
           name: pathname,
           contentType,
+          ...(deepCitation ? { deepCitation } : {}),
         };
       }
       const { error } = await response.json();

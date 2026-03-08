@@ -118,6 +118,10 @@ export function Chat({
             })
           );
 
+        // Aggregate deepCitation metadata from current attachments
+        const dcData = deepCitationRef.current;
+        deepCitationRef.current = null;
+
         return {
           body: {
             id: request.id,
@@ -126,6 +130,7 @@ export function Chat({
               : { message: lastMessage }),
             selectedChatModel: currentModelIdRef.current,
             selectedVisibilityType: visibilityType,
+            ...(dcData ? { deepCitation: dcData } : {}),
             ...request.body,
           },
         };
@@ -177,6 +182,10 @@ export function Chat({
   );
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const deepCitationRef = useRef<{
+    attachmentIds: string[];
+    deepTextPromptPortion: string;
+  } | null>(null);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
 
   useAutoResume({
@@ -213,6 +222,7 @@ export function Chat({
             <MultimodalInput
               attachments={attachments}
               chatId={id}
+              deepCitationRef={deepCitationRef}
               input={input}
               messages={messages}
               onModelChange={setCurrentModelId}

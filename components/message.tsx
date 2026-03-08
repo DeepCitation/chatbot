@@ -1,9 +1,11 @@
 "use client";
 import type { UseChatHelpers } from "@ai-sdk/react";
-import { useState } from "react";
+import { extractVisibleText } from "deepcitation";
+import { useEffect, useState } from "react";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
+import { useCitationVerification } from "./citation-verification-provider";
 import { useDataStream } from "./data-stream-provider";
 import { DocumentToolResult } from "./document";
 import { DocumentPreview } from "./document-preview";
@@ -45,6 +47,22 @@ const PurePreviewMessage = ({
   requiresScrollPadding: boolean;
 }) => {
   const [mode, setMode] = useState<"view" | "edit">("view");
+  const { getVerification, setVerification } = useCitationVerification();
+  const citationData = getVerification(message.id);
+
+  // Pick up "__latest" verification and assign it to this message if it's the last assistant message
+  const latestVerification = getVerification("__latest");
+  useEffect(() => {
+    if (
+      latestVerification &&
+      message.role === "assistant" &&
+      !citationData
+    ) {
+      setVerification(message.id, latestVerification);
+      // Clear the latest slot
+      setVerification("__latest", undefined as unknown as typeof latestVerification);
+    }
+  }, [latestVerification, message.id, message.role, citationData, setVerification]);
 
   const attachmentsFromMessage = message.parts.filter(
     (part) => part.type === "file"
@@ -125,6 +143,12 @@ const PurePreviewMessage = ({
 
             if (type === "text") {
               if (mode === "view") {
+                // For assistant messages with citation data, strip the citation data block
+                const displayText =
+                  message.role === "assistant" && citationData
+                    ? sanitizeText(extractVisibleText(part.text))
+                    : sanitizeText(part.text);
+
                 return (
                   <div key={key}>
                     <MessageContent
@@ -141,7 +165,7 @@ const PurePreviewMessage = ({
                           : undefined
                       }
                     >
-                      <Response>{sanitizeText(part.text)}</Response>
+                      <Response>{displayText}</Response>
                     </MessageContent>
                   </div>
                 );

@@ -94,7 +94,10 @@ export function getTrailingMessageId({
 }
 
 export function sanitizeText(text: string) {
-  return text.replace('<has_function_call>', '');
+  return text
+    .replace('<has_function_call>', '')
+    .replace(/<<<CITATION_DATA>>>[\s\S]*?(<<<END_CITATION_DATA>>>|$)/g, '')
+    .trim();
 }
 
 export function convertToUIMessages(messages: DBMessage[]): ChatMessage[] {

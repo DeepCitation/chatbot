@@ -1,3 +1,9 @@
+import {
+  extractVisibleText,
+  getAllCitationsFromLlmOutput,
+  groupCitationsByAttachmentId,
+  wrapCitationPrompt,
+} from "deepcitation";
 import { geolocation, ipAddress } from "@vercel/functions";
 import {
   convertToModelMessages,
@@ -34,6 +40,7 @@ import {
 import type { DBMessage } from "@/lib/db/schema";
 import { ChatbotError } from "@/lib/errors";
 import { checkIpRateLimit } from "@/lib/ratelimit";
+import { getDeepCitationClient } from "@/lib/ai/deepcitation";
 import type { ChatMessage } from "@/lib/types";
 import { convertToUIMessages, generateUUID } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
@@ -62,8 +69,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, messages, selectedChatModel, selectedVisibilityType } =
-      requestBody;
+    const {
+      id,
+      message,
+      messages,
+      selectedChatModel,
+      selectedVisibilityType,
+      deepCitation: deepCitationData,
+    } = requestBody;
 
     const [botResult, session] = await Promise.all([checkBotId(), auth()]);
 
@@ -150,12 +163,59 @@ export async function POST(request: Request) {
 
     const modelMessages = await convertToModelMessages(uiMessages);
 
+    // Wrap prompts with citation instructions if deepCitation data is present
+    const baseSystemPrompt = systemPrompt({ selectedChatModel, requestHints });
+    let finalSystemPrompt = baseSystemPrompt;
+    let citationUserPrompt: string | undefined;
+
+    if (deepCitationData) {
+      const lastUserMsg = modelMessages
+        .filter((m) => m.role === "user")
+        .at(-1);
+
+      let userText = "";
+      if (lastUserMsg) {
+        const content = lastUserMsg.content;
+        if (typeof content === "string") {
+          userText = content;
+        } else if (Array.isArray(content)) {
+          userText = content
+            .filter((p) => p.type === "text")
+            .map((p) => ("text" in p ? p.text : ""))
+            .join("");
+        }
+      }
+
+      const { enhancedSystemPrompt, enhancedUserPrompt } = wrapCitationPrompt({
+        systemPrompt: baseSystemPrompt,
+        userPrompt: userText,
+        deepTextPromptPortion: deepCitationData.deepTextPromptPortion,
+      });
+
+      finalSystemPrompt = enhancedSystemPrompt;
+      citationUserPrompt = enhancedUserPrompt;
+
+      // Replace the last user message text with the enhanced prompt
+      if (citationUserPrompt && lastUserMsg) {
+        const content = lastUserMsg.content;
+        if (typeof content === "string") {
+          lastUserMsg.content = citationUserPrompt;
+        } else if (Array.isArray(content)) {
+          const textPartIndex = content.findIndex((p) => p.type === "text");
+          if (textPartIndex >= 0) {
+            (content[textPartIndex] as { type: string; text: string }).text =
+              citationUserPrompt;
+          }
+        }
+      }
+    }
+
     const stream = createUIMessageStream({
       originalMessages: isToolApprovalFlow ? uiMessages : undefined,
       execute: async ({ writer: dataStream }) => {
         const result = streamText({
           model: getLanguageModel(selectedChatModel),
-          system: systemPrompt({ selectedChatModel, requestHints }),
+          system: finalSystemPrompt,
           messages: modelMessages,
           stopWhen: stepCountIs(5),
           experimental_activeTools: isReasoningModel
@@ -188,6 +248,48 @@ export async function POST(request: Request) {
         dataStream.merge(
           result.toUIMessageStream({ sendReasoning: isReasoningModel })
         );
+
+        // Citation verification: parse and verify after LLM finishes
+        if (deepCitationData) {
+          const dc = getDeepCitationClient();
+          if (dc) {
+            try {
+              const fullText = await result.text;
+              const citations = getAllCitationsFromLlmOutput(fullText);
+
+              if (Object.keys(citations).length > 0) {
+                const citationsByAttachment =
+                  groupCitationsByAttachmentId(citations);
+                const allVerifications: Record<string, unknown> = {};
+
+                const verifyPromises = Array.from(
+                  citationsByAttachment.entries()
+                ).map(async ([attachmentId, fileCitations]) => {
+                  const response = await dc.verifyAttachment(
+                    attachmentId,
+                    fileCitations
+                  );
+                  Object.assign(allVerifications, response.verifications);
+                });
+
+                await Promise.all(verifyPromises);
+
+                const visibleText = extractVisibleText(fullText);
+
+                dataStream.write({
+                  type: "data-citation-verification",
+                  data: {
+                    verifications: allVerifications,
+                    visibleText,
+                    attachmentIds: deepCitationData.attachmentIds,
+                  },
+                });
+              }
+            } catch (verifyError) {
+              console.error("Citation verification failed:", verifyError);
+            }
+          }
+        }
 
         if (titlePromise) {
           const title = await titlePromise;

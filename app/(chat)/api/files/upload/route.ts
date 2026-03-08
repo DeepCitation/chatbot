@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
+import { getDeepCitationClient } from "@/lib/ai/deepcitation";
 
 // Use Blob instead of File since File is not available in Node.js environment
 const FileSchema = z.object({
@@ -12,9 +13,13 @@ const FileSchema = z.object({
       message: "File size should be less than 5MB",
     })
     // Update the file type based on the kind of files you want to accept
-    .refine((file) => ["image/jpeg", "image/png"].includes(file.type), {
-      message: "File type should be JPEG or PNG",
-    }),
+    .refine(
+      (file) =>
+        ["image/jpeg", "image/png", "application/pdf"].includes(file.type),
+      {
+        message: "File type should be JPEG, PNG, or PDF",
+      }
+    ),
 });
 
 export async function POST(request: Request) {
@@ -54,6 +59,33 @@ export async function POST(request: Request) {
       const data = await put(`${filename}`, fileBuffer, {
         access: "public",
       });
+
+      // Prepare attachment with DeepCitation if available
+      const dc = getDeepCitationClient();
+      if (dc) {
+        try {
+          const result = await dc.prepareAttachments([
+            {
+              file: Buffer.from(fileBuffer),
+              filename,
+            },
+          ]);
+
+          const attachment = result.attachments[0];
+          if (attachment) {
+            return NextResponse.json({
+              ...data,
+              deepCitation: {
+                attachmentId: attachment.attachmentId,
+                deepTextPromptPortion: result.deepTextPromptPortion,
+              },
+            });
+          }
+        } catch (dcError) {
+          // Log but don't fail the upload if DeepCitation fails
+          console.error("DeepCitation prepareAttachments failed:", dcError);
+        }
+      }
 
       return NextResponse.json(data);
     } catch (_error) {

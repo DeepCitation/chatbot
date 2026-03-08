@@ -42,6 +42,11 @@ export type CustomUIDataTypes = {
   clear: null;
   finish: null;
   "chat-title": string;
+  "citation-verification": {
+    verifications: Record<string, unknown>;
+    visibleText: string;
+    attachmentIds: string[];
+  };
 };
 
 export type ChatMessage = UIMessage<
@@ -54,4 +59,8 @@ export type Attachment = {
   name: string;
   url: string;
   contentType: string;
+  deepCitation?: {
+    attachmentId: string;
+    deepTextPromptPortion: string;
+  };
 };

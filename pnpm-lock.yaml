@@ -122,6 +122,9 @@ importers:
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
+      deepcitation:
+        specifier: ^0.2.0
+        version: 0.2.0(react-dom@19.0.1(react@19.0.1))(react@19.0.1)
       diff-match-patch:
         specifier: ^1.0.5
         version: 1.0.5
@@ -2466,7 +2469,7 @@ packages:
   '@vercel/postgres@0.10.0':
     resolution: {integrity: sha512-fSD23DxGND40IzSkXjcFcxr53t3Tiym59Is0jSYIFpG4/0f0KO9SGtcp1sXiebvPaGe7N/tU05cH4yt2S6/IPg==}
     engines: {node: '>=18.14'}
-    deprecated: '@vercel/postgres is deprecated. If you are setting up a new database, you can choose an alternate storage solution from the Vercel Marketplace. If you had an existing Vercel Postgres database, it should have been migrated to Neon as a native Vercel integration. You can find more details and the guide to migrate to Neon''s SDKs here: https://neon.com/docs/guides/vercel-postgres-transition-guide'
+    deprecated: '@vercel/postgres is deprecated. You can either choose an alternate storage solution from the Vercel Marketplace if you want to set up a new database. Or you can follow this guide to migrate your existing Vercel Postgres db: https://neon.com/docs/guides/vercel-postgres-transition-guide'
 
   '@xyflow/react@12.10.0':
     resolution: {integrity: sha512-eOtz3whDMWrB4KWVatIBrKuxECHqip6PfA8fTpaS2RUGVpiEAe+nqDKsLqkViVWxDGreq0lWX71Xth/SPAzXiw==}
@@ -2691,6 +2694,18 @@ packages:
 
   decode-named-character-reference@1.1.0:
     resolution: {integrity: sha512-Wy+JTSbFThEOXQIR2L6mxJvEs+veIzpmqD7ynWxMXGpnk3smkHQOp6forLdHsKpAMW9iJpaBBIxz285t1n1C3w==}
+
+  deepcitation@0.2.0:
+    resolution: {integrity: sha512-C2HIgSfV22A6e3wv5zHRcOVfboUTCSNAJMujYhBuQGd9fIGV8lFxrke1WeqhdLq9d4UkZ/f75PbEYIxu7uG45Q==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
+        optional: true
 
   deepmerge@4.3.1:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
@@ -6149,6 +6164,11 @@ snapshots:
   decode-named-character-reference@1.1.0:
     dependencies:
       character-entities: 2.0.2
+
+  deepcitation@0.2.0(react-dom@19.0.1(react@19.0.1))(react@19.0.1):
+    optionalDependencies:
+      react: 19.0.1
+      react-dom: 19.0.1(react@19.0.1)
 
   deepmerge@4.3.1: {}
 
