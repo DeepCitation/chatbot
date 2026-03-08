@@ -72,9 +72,8 @@ export async function POST(request: Request) {
     const isImage = IMAGE_MIME_TYPES.includes(file.type);
 
     try {
-      // Private store requires private access; returned URLs include auth tokens
       const data = await put(`${filename}`, fileBuffer, {
-        access: "private",
+        access: "public",
         addRandomSuffix: true,
       });
 
