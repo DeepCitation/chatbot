@@ -166,7 +166,6 @@ export async function POST(request: Request) {
     // Wrap prompts with citation instructions if deepCitation data is present
     const baseSystemPrompt = systemPrompt({ selectedChatModel, requestHints });
     let finalSystemPrompt = baseSystemPrompt;
-    let citationUserPrompt: string | undefined;
 
     if (deepCitationData) {
       const lastUserMsg = modelMessages
@@ -193,18 +192,17 @@ export async function POST(request: Request) {
       });
 
       finalSystemPrompt = enhancedSystemPrompt;
-      citationUserPrompt = enhancedUserPrompt;
 
       // Replace the last user message text with the enhanced prompt
-      if (citationUserPrompt && lastUserMsg) {
+      if (enhancedUserPrompt && lastUserMsg) {
         const content = lastUserMsg.content;
         if (typeof content === "string") {
-          lastUserMsg.content = citationUserPrompt;
+          lastUserMsg.content = enhancedUserPrompt;
         } else if (Array.isArray(content)) {
           const textPartIndex = content.findIndex((p) => p.type === "text");
           if (textPartIndex >= 0) {
             (content[textPartIndex] as { type: string; text: string }).text =
-              citationUserPrompt;
+              enhancedUserPrompt;
           }
         }
       }

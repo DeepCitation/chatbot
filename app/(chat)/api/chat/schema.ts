@@ -7,7 +7,7 @@ const textPartSchema = z.object({
 
 const filePartSchema = z.object({
   type: z.enum(["file"]),
-  mediaType: z.string(),
+  mediaType: z.string().min(1),
   name: z.string().min(1).max(100),
   url: z.string().url(),
 });

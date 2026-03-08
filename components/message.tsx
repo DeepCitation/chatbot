@@ -58,8 +58,7 @@ const PurePreviewMessage = ({
       !citationData
     ) {
       setVerification(message.id, latestVerification);
-      // Clear the latest slot
-      setVerification("__latest", undefined as unknown as typeof latestVerification);
+      setVerification("__latest", undefined);
     }
   }, [latestVerification, message.id, message.role, citationData, setVerification]);
 
