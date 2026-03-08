@@ -259,81 +259,87 @@ export async function POST(request: Request) {
         }
 
         // Citation verification runs after the LLM finishes but before
-        // the stream closes, so the verification event reaches the client
+        // the stream closes, so the verification event reaches the client.
+        // Bounded by a 20s timeout to avoid Vercel function timeout (maxDuration=60).
         if (deepCitationData) {
           const dc = getDeepCitationClient();
           if (dc) {
+            const VERIFY_TIMEOUT = 20_000;
             try {
-              const fullText = await result.text;
-              console.log("[DeepCitation] LLM output length:", fullText.length);
+              await Promise.race([
+                (async () => {
+                  const fullText = await result.text;
+                  console.log("[DeepCitation] LLM output length:", fullText.length);
 
-              const citations = getAllCitationsFromLlmOutput(fullText);
-              const citationCount = Object.keys(citations).length;
-              console.log("[DeepCitation] Parsed citations:", citationCount);
+                  const citations = getAllCitationsFromLlmOutput(fullText);
+                  const citationCount = Object.keys(citations).length;
+                  console.log("[DeepCitation] Parsed citations:", citationCount);
 
-              const visibleText = extractVisibleText(fullText);
+                  const visibleText = extractVisibleText(fullText);
 
-              if (citationCount > 0) {
-                const citationsByAttachment =
-                  groupCitationsByAttachmentId(citations);
-                const allVerifications: Record<string, unknown> = {};
+                  if (citationCount > 0) {
+                    const citationsByAttachment =
+                      groupCitationsByAttachmentId(citations);
+                    const allVerifications: Record<string, unknown> = {};
 
-                const verifyPromises = Array.from(
-                  citationsByAttachment.entries()
-                ).map(async ([attachmentId, fileCitations]) => {
-                  console.log("[DeepCitation] Verifying attachment:", attachmentId, "citations:", fileCitations.length);
-                  const response = await dc.verifyAttachment(
-                    attachmentId,
-                    fileCitations
-                  );
-                  Object.assign(allVerifications, response.verifications);
-                });
+                    const verifyPromises = Array.from(
+                      citationsByAttachment.entries()
+                    ).map(async ([attachmentId, fileCitations]) => {
+                      console.log("[DeepCitation] Verifying attachment:", attachmentId, "citations:", fileCitations.length);
+                      const response = await dc.verifyAttachment(
+                        attachmentId,
+                        fileCitations
+                      );
+                      Object.assign(allVerifications, response.verifications);
+                    });
 
-                await Promise.all(verifyPromises);
-                console.log("[DeepCitation] Verification complete, keys:", Object.keys(allVerifications).length);
+                    await Promise.all(verifyPromises);
+                    console.log("[DeepCitation] Verification complete, keys:", Object.keys(allVerifications).length);
 
-                // Render citations as markdown with verification indicators
-                let renderedMarkdown = visibleText;
-                try {
-                  const { renderCitationsAsMarkdown } = await import("deepcitation");
-                  const rendered = renderCitationsAsMarkdown(fullText, {
-                    verifications: allVerifications as Record<string, never>,
-                    indicatorStyle: "check",
-                  });
-                  renderedMarkdown = rendered.full;
-                  console.log("[DeepCitation] Rendered markdown length:", renderedMarkdown.length);
-                } catch (renderError) {
-                  console.error("[DeepCitation] renderCitationsAsMarkdown failed:", renderError);
-                }
+                    let renderedMarkdown = visibleText;
+                    try {
+                      const { renderCitationsAsMarkdown } = await import("deepcitation");
+                      const rendered = renderCitationsAsMarkdown(fullText, {
+                        verifications: allVerifications as Record<string, never>,
+                        indicatorStyle: "check",
+                      });
+                      renderedMarkdown = rendered.full;
+                      console.log("[DeepCitation] Rendered markdown length:", renderedMarkdown.length);
+                    } catch (renderError) {
+                      console.error("[DeepCitation] renderCitationsAsMarkdown failed:", renderError);
+                    }
 
-                dataStream.write({
-                  type: "data-citation-verification",
-                  data: {
-                    verifications: allVerifications,
-                    visibleText,
-                    renderedMarkdown,
-                    attachmentIds: deepCitationData.attachmentIds,
-                  },
-                });
-              } else {
-                console.log("[DeepCitation] No citations in LLM output, sending visible text only");
-                dataStream.write({
-                  type: "data-citation-verification",
-                  data: {
-                    verifications: {},
-                    visibleText,
-                    renderedMarkdown: visibleText,
-                    attachmentIds: deepCitationData.attachmentIds,
-                  },
-                });
-              }
+                    dataStream.write({
+                      type: "data-citation-verification",
+                      data: {
+                        verifications: allVerifications,
+                        visibleText,
+                        renderedMarkdown,
+                        attachmentIds: deepCitationData.attachmentIds,
+                      },
+                    });
+                  } else {
+                    console.log("[DeepCitation] No citations found, sending visible text");
+                    dataStream.write({
+                      type: "data-citation-verification",
+                      data: {
+                        verifications: {},
+                        visibleText,
+                        renderedMarkdown: visibleText,
+                        attachmentIds: deepCitationData.attachmentIds,
+                      },
+                    });
+                  }
 
-              console.log("[DeepCitation] Wrote citation-verification event to data stream");
+                  console.log("[DeepCitation] Wrote citation-verification event");
+                })(),
+                new Promise((_, reject) =>
+                  setTimeout(() => reject(new Error("Citation verification timed out")), VERIFY_TIMEOUT)
+                ),
+              ]);
             } catch (verifyError) {
               console.error("[DeepCitation] Citation verification failed:", verifyError);
             }
-          } else {
-            console.warn("[DeepCitation] No API key configured — skipping verification");
           }
         }
       },
