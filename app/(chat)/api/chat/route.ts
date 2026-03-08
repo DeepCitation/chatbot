@@ -2,7 +2,6 @@ import {
   extractVisibleText,
   getAllCitationsFromLlmOutput,
   groupCitationsByAttachmentId,
-  renderCitationsAsMarkdown,
   wrapCitationPrompt,
 } from "deepcitation";
 import { geolocation, ipAddress } from "@vercel/functions";
@@ -296,6 +295,7 @@ export async function POST(request: Request) {
                 // Render citations as markdown with verification indicators
                 let renderedMarkdown = visibleText;
                 try {
+                  const { renderCitationsAsMarkdown } = await import("deepcitation");
                   const rendered = renderCitationsAsMarkdown(fullText, {
                     verifications: allVerifications as Record<string, never>,
                     indicatorStyle: "check",
