@@ -161,7 +161,22 @@ export async function POST(request: Request) {
       (selectedChatModel.includes("reasoning") &&
         !selectedChatModel.includes("non-reasoning"));
 
-    const modelMessages = await convertToModelMessages(uiMessages);
+    // Strip file parts with non-accessible URLs (private blob URLs from old
+    // messages). Only data: URLs and https: URLs from trusted origins are kept.
+    const cleanedUiMessages = uiMessages.map((msg) => ({
+      ...msg,
+      parts: msg.parts.filter((part) => {
+        if (part.type !== "file") return true;
+        const url = (part as { url?: string }).url;
+        if (!url) return false;
+        // Keep data URLs (base64 inline) — always accessible
+        if (url.startsWith("data:")) return true;
+        // Drop private blob URLs and other inaccessible URLs
+        return false;
+      }),
+    }));
+
+    const modelMessages = await convertToModelMessages(cleanedUiMessages);
 
     // Wrap prompts with citation instructions if deepCitation data is present
     const baseSystemPrompt = systemPrompt({ selectedChatModel, requestHints });

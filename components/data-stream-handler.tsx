@@ -5,14 +5,12 @@ import { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { initialArtifactData, useArtifact } from "@/hooks/use-artifact";
 import { artifactDefinitions } from "./artifact";
-import { useCitationVerification } from "./citation-verification-provider";
 import { useDataStream } from "./data-stream-provider";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
 
 export function DataStreamHandler() {
   const { dataStream, setDataStream } = useDataStream();
   const { mutate } = useSWRConfig();
-  const { setVerification } = useCitationVerification();
 
   const { artifact, setArtifact, setMetadata } = useArtifact();
 
@@ -31,17 +29,8 @@ export function DataStreamHandler() {
         continue;
       }
 
-      // Handle citation verification results
-      // Store under "__latest" key; the message component picks it up
+      // Citation verification is handled directly in chat.tsx onData callback
       if (delta.type === "data-citation-verification") {
-        const data = delta.data as {
-          verifications: Record<string, unknown>;
-          visibleText: string;
-          renderedMarkdown: string;
-          attachmentIds: string[];
-        };
-        console.log("[DeepCitation] Received citation-verification event, renderedMarkdown length:", data.renderedMarkdown?.length);
-        setVerification("__latest", data);
         continue;
       }
       const artifactDefinition = artifactDefinitions.find(
@@ -102,7 +91,7 @@ export function DataStreamHandler() {
         }
       });
     }
-  }, [dataStream, setArtifact, setMetadata, artifact, setDataStream, mutate, setVerification]);
+  }, [dataStream, setArtifact, setMetadata, artifact, setDataStream, mutate]);
 
   return null;
 }

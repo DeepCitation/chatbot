@@ -25,6 +25,7 @@ import { ChatbotError } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
 import { Artifact } from "./artifact";
+import { useCitationVerification } from "./citation-verification-provider";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
@@ -67,6 +68,8 @@ export function Chat({
     return () => window.removeEventListener("popstate", handlePopState);
   }, [router]);
   const { setDataStream } = useDataStream();
+  const { setVerification } = useCitationVerification();
+  const messagesRef = useRef<ChatMessage[]>([]);
 
   const [input, setInput] = useState<string>("");
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
@@ -137,6 +140,20 @@ export function Chat({
       },
     }),
     onData: (dataPart) => {
+      // Citation verification: assign directly to the last assistant message
+      if (dataPart.type === "data-citation-verification") {
+        const lastAssistant = [...messagesRef.current]
+          .reverse()
+          .find((m) => m.role === "assistant");
+        if (lastAssistant) {
+          setVerification(lastAssistant.id, dataPart.data as {
+            verifications: Record<string, unknown>;
+            visibleText: string;
+            renderedMarkdown: string;
+            attachmentIds: string[];
+          });
+        }
+      }
       setDataStream((ds) => (ds ? [...ds, dataPart] : []));
     },
     onFinish: () => {
@@ -158,6 +175,11 @@ export function Chat({
       }
     },
   });
+
+  // Keep messagesRef in sync for use in onData closure
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const searchParams = useSearchParams();
   const query = searchParams.get("query");

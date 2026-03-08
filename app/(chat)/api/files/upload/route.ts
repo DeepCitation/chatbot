@@ -28,13 +28,22 @@ const ALLOWED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...DOCUMENT_MIME_TYPES];
 const FileSchema = z.object({
   file: z
     .instanceof(Blob)
-    .refine((file) => file.size <= 50 * 1024 * 1024, {
-      message: "File size should be less than 50MB",
-    })
     .refine((file) => ALLOWED_MIME_TYPES.includes(file.type), {
       message:
         "Unsupported file type. Accepted: images (JPEG, PNG, TIFF, WebP), PDF, and Office documents (DOC, DOCX, XLS, XLSX, PPT, PPTX)",
-    }),
+    })
+    .refine(
+      (file) => {
+        const isImage = IMAGE_MIME_TYPES.includes(file.type);
+        // Images are converted to base64, so keep them smaller (10MB).
+        // Documents are stored as blobs and only extracted as text (50MB).
+        const limit = isImage ? 10 * 1024 * 1024 : 50 * 1024 * 1024;
+        return file.size <= limit;
+      },
+      {
+        message: "File too large. Images: max 10MB, documents: max 50MB.",
+      }
+    ),
 });
 
 export async function POST(request: Request) {

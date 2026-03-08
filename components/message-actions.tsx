@@ -5,6 +5,7 @@ import { useSWRConfig } from "swr";
 import { useCopyToClipboard } from "usehooks-ts";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
+import { sanitizeText } from "@/lib/utils";
 import { Action, Actions } from "./elements/actions";
 import { CopyIcon, PencilEditIcon, ThumbDownIcon, ThumbUpIcon } from "./icons";
 
@@ -28,11 +29,16 @@ export function PureMessageActions({
     return null;
   }
 
-  const textFromParts = message.parts
+  const rawText = message.parts
     ?.filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("\n")
     .trim();
+
+  // Strip citation data blocks from assistant messages before copying
+  const textFromParts = message.role === "assistant" && rawText
+    ? sanitizeText(rawText)
+    : rawText;
 
   const handleCopy = async () => {
     if (!textFromParts) {

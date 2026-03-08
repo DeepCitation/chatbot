@@ -1,6 +1,6 @@
 "use client";
 import type { UseChatHelpers } from "@ai-sdk/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
@@ -46,22 +46,8 @@ const PurePreviewMessage = ({
   requiresScrollPadding: boolean;
 }) => {
   const [mode, setMode] = useState<"view" | "edit">("view");
-  const { getVerification, setVerification } = useCitationVerification();
+  const { getVerification } = useCitationVerification();
   const citationData = getVerification(message.id);
-
-  // Pick up "__latest" verification and assign it to this message if it's the last assistant message
-  const latestVerification = getVerification("__latest");
-  useEffect(() => {
-    if (
-      latestVerification &&
-      message.role === "assistant" &&
-      !citationData
-    ) {
-      console.log("[DeepCitation] Assigning verification to message:", message.id, "renderedMarkdown length:", latestVerification.renderedMarkdown?.length);
-      setVerification(message.id, latestVerification);
-      setVerification("__latest", undefined);
-    }
-  }, [latestVerification, message.id, message.role, citationData, setVerification]);
 
   const attachmentsFromMessage = message.parts.filter(
     (part) => part.type === "file"
