@@ -75,7 +75,15 @@ export async function POST(request: Request) {
       // Private store requires private access; returned URLs include auth tokens
       const data = await put(`${filename}`, fileBuffer, {
         access: "private",
+        addRandomSuffix: true,
       });
+
+      // For non-image documents, always override contentType so the client
+      // never sends raw bytes as a file part (LLMs can't process DOCX/PDF etc.)
+      // Document content reaches the LLM via deepTextPromptPortion instead.
+      const responseData = !isImage
+        ? { ...data, contentType: "application/deepcitation" }
+        : data;
 
       // Prepare attachment with DeepCitation if available
       const dc = getDeepCitationClient();
@@ -91,10 +99,7 @@ export async function POST(request: Request) {
           const attachment = result.attachments[0];
           if (attachment) {
             return NextResponse.json({
-              ...data,
-              // For documents, override contentType so client doesn't send
-              // raw bytes as a file part (LLMs can't process DOCX/PPTX etc.)
-              ...(!isImage ? { contentType: "application/deepcitation" } : {}),
+              ...responseData,
               deepCitation: {
                 attachmentId: attachment.attachmentId,
                 deepTextPromptPortion: result.deepTextPromptPortion,
@@ -107,7 +112,7 @@ export async function POST(request: Request) {
         }
       }
 
-      return NextResponse.json(data);
+      return NextResponse.json(responseData);
     } catch (error) {
       console.error("Upload failed:", error);
       return NextResponse.json(
