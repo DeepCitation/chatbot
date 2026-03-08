@@ -40,6 +40,7 @@ export function DataStreamHandler() {
           renderedMarkdown: string;
           attachmentIds: string[];
         };
+        console.log("[DeepCitation] Received citation-verification event, renderedMarkdown length:", data.renderedMarkdown?.length);
         setVerification("__latest", data);
         continue;
       }

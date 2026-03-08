@@ -272,6 +272,8 @@ export async function POST(request: Request) {
               const citationCount = Object.keys(citations).length;
               console.log("[DeepCitation] Parsed citations:", citationCount);
 
+              const visibleText = extractVisibleText(fullText);
+
               if (citationCount > 0) {
                 const citationsByAttachment =
                   groupCitationsByAttachmentId(citations);
@@ -292,25 +294,28 @@ export async function POST(request: Request) {
                 console.log("[DeepCitation] Verification complete, keys:", Object.keys(allVerifications).length);
 
                 // Render citations as markdown with verification indicators
-                const rendered = renderCitationsAsMarkdown(fullText, {
-                  verifications: allVerifications as Record<string, never>,
-                  indicatorStyle: "check",
-                });
-
-                const visibleText = extractVisibleText(fullText);
+                let renderedMarkdown = visibleText;
+                try {
+                  const rendered = renderCitationsAsMarkdown(fullText, {
+                    verifications: allVerifications as Record<string, never>,
+                    indicatorStyle: "check",
+                  });
+                  renderedMarkdown = rendered.full;
+                  console.log("[DeepCitation] Rendered markdown length:", renderedMarkdown.length);
+                } catch (renderError) {
+                  console.error("[DeepCitation] renderCitationsAsMarkdown failed:", renderError);
+                }
 
                 dataStream.write({
                   type: "data-citation-verification",
                   data: {
                     verifications: allVerifications,
                     visibleText,
-                    renderedMarkdown: rendered.full,
+                    renderedMarkdown,
                     attachmentIds: deepCitationData.attachmentIds,
                   },
                 });
               } else {
-                // No citations found — still send rendered text without citation data block
-                const visibleText = extractVisibleText(fullText);
                 console.log("[DeepCitation] No citations in LLM output, sending visible text only");
                 dataStream.write({
                   type: "data-citation-verification",
@@ -322,6 +327,8 @@ export async function POST(request: Request) {
                   },
                 });
               }
+
+              console.log("[DeepCitation] Wrote citation-verification event to data stream");
             } catch (verifyError) {
               console.error("[DeepCitation] Citation verification failed:", verifyError);
             }

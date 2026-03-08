@@ -57,6 +57,7 @@ const PurePreviewMessage = ({
       message.role === "assistant" &&
       !citationData
     ) {
+      console.log("[DeepCitation] Assigning verification to message:", message.id, "renderedMarkdown length:", latestVerification.renderedMarkdown?.length);
       setVerification(message.id, latestVerification);
       setVerification("__latest", undefined);
     }
