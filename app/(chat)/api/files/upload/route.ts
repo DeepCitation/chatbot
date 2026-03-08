@@ -70,7 +70,7 @@ export async function POST(request: Request) {
 
     try {
       const data = await put(`${filename}`, fileBuffer, {
-        access: "public",
+        access: "private",
       });
 
       // Prepare attachment with DeepCitation if available
