@@ -8,8 +8,8 @@ const textPartSchema = z.object({
 const filePartSchema = z.object({
   type: z.enum(["file"]),
   mediaType: z.string().min(1),
-  name: z.string().min(1).max(100),
-  url: z.string().url(),
+  filename: z.string().min(1).max(200).optional(),
+  url: z.string().min(1),
 });
 
 const partSchema = z.union([textPartSchema, filePartSchema]);
